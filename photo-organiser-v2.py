@@ -5,6 +5,7 @@ from PIL import Image, ImageTk
 import pathlib
 import threading
 from datetime import datetime
+import shutil
 
 class PhotoOrganizerApp:
     def __init__(self, root):
@@ -13,11 +14,15 @@ class PhotoOrganizerApp:
         self.isFullScreen = True
         self.addedCount=0
         self.autoSaveAllowed=False
+        self.running = True
 
         # Enable fullscreen mode
         self.root.attributes('-fullscreen', self.isFullScreen)
         self.root.bind("<Escape>", self.exit_fullscreen)
         self.root.bind("<F11>", self.toggle_fullscreen)
+        
+        # Override close event
+        self.root.protocol("WM_DELETE_WINDOW", self.on_exit)
 
         # Bind the Left Arrow key to the previous_action function
         self.root.bind("<Left>", self.previous_image)
@@ -61,14 +66,42 @@ class PhotoOrganizerApp:
         self.toolbar.pack(side="top", fill="x")
 
         
-        tk.Button(self.toolbar, text="Add Folder", command=self.add_folder).pack(side="left", padx=10, pady=10)
-        tk.Button(self.toolbar, text="Previous", command=self.previous_image).pack(side="left", padx=10, pady=10)
-        tk.Button(self.toolbar, text="Next", command=self.next_image).pack(side="left", padx=10, pady=10)
-        tk.Button(self.toolbar, text="Add to List : L", command=self.add_to_list).pack(side="left", padx=10, pady=10)
-        tk.Button(self.toolbar, text="Remove from List : R", command=self.remove_from_list).pack(side="left", padx=10, pady=10)
-        tk.Button(self.toolbar, text="Export List", command=self.export_list).pack(side="left", padx=10, pady=10)
-        tk.Button(self.toolbar, text="Auto Save", command=self.start_auto_save).pack(side="left", padx=10, pady=10)
-        tk.Button(self.toolbar, text="New List", command=self.create_new_list).pack(side="left", padx=10, pady=10)
+       # Create the main menu
+        self.menu_bar = tk.Menu(self.root)
+
+        # Add "File" menu
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        file_menu.add_command(label="Add Folder", command=self.add_folder)
+        file_menu.add_command(label="Export List", command=self.export_list_to_folder)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_exit)  # Add an exit option
+        self.menu_bar.add_cascade(label="File", menu=file_menu)
+
+        # Add "Navigation" menu
+        navigation_menu = tk.Menu(self.menu_bar, tearoff=0)
+        navigation_menu.add_command(label="Previous Image", command=self.previous_image)
+        navigation_menu.add_command(label="Next Image", command=self.next_image)
+        self.menu_bar.add_cascade(label="Navigation", menu=navigation_menu)
+
+        # Add "List" menu
+        list_menu = tk.Menu(self.menu_bar, tearoff=0)
+        list_menu.add_command(label="Add to List (L)", command=self.add_to_list)
+        list_menu.add_command(label="Remove from List (R)", command=self.remove_from_list)
+        list_menu.add_command(label="Create New List", command=self.create_new_list)
+        self.menu_bar.add_cascade(label="List", menu=list_menu)
+
+        # Add "Options" menu
+        options_menu = tk.Menu(self.menu_bar, tearoff=0)
+        options_menu.add_command(label="Start/Stop Auto Save", command=self.start_auto_save)
+        self.menu_bar.add_cascade(label="Options", menu=options_menu)
+
+        # Add "Help" menu
+        help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Photo Organizer App v1.0\nDeveloped by You"))
+        self.menu_bar.add_cascade(label="Help", menu=help_menu)
+
+        # Configure the menu bar
+        self.root.config(menu=self.menu_bar)
 
         # Dropdown for selecting lists
         self.list_var = tk.StringVar(value=self.current_list)
@@ -107,6 +140,115 @@ class PhotoOrganizerApp:
         #schedule for auto save
         self.save_data_auto()
 
+    def export_list_to_folder(self, event=None):
+        """Export the list of files to the selected folder."""
+        input_file = os.path.join(self.documents_folder, f"{self.current_list}.txt")
+
+        # Check if the user selected a file
+        if not os.path.exists(input_file):
+            print("Input file not found. Exiting.")
+            return
+
+        # Prompt the user to select the destination folder
+        destination_folder = filedialog.askdirectory(title="Select the Destination Folder")
+
+        # Check if the user selected a folder
+        if not destination_folder:
+            print("No destination folder selected. Exiting.")
+            return
+
+        # Create a progress window
+        progress_window = tk.Toplevel(self.root)
+        progress_window.title("Copying Files")
+        progress_window.geometry("400x150")
+        progress_window.transient(self.root)  # Makes the progress window appear above the main window
+        progress_window.grab_set()  # Focus on this window
+
+        progress_label = tk.Label(progress_window, text="Copying files...", font=("Arial", 12))
+        progress_label.pack(pady=10)
+
+        progress_bar = ttk.Progressbar(progress_window, orient="horizontal", length=300, mode="determinate")
+        progress_bar.pack(pady=10)
+
+        copied_count = tk.StringVar(value="0/0")
+        count_label = tk.Label(progress_window, textvariable=copied_count, font=("Arial", 10))
+        count_label.pack()
+
+        # Start copying files in a separate thread
+        self.copy_files_to_folder(input_file, destination_folder, progress_bar,progress_label, copied_count, progress_window)
+
+
+    def copy_files_to_folder(self, input_file, destination_folder, progress_bar,progress_label, copied_count, progress_window):
+        """Copy files listed in the input file to the destination folder."""
+        try:
+            # Read the file paths from the input file
+            with open(input_file, "r") as f:
+                file_paths = f.read().splitlines()
+
+            # Total number of files to copy
+            total_files = len(file_paths)
+            progress_bar["maximum"] = total_files
+
+            # Ensure the destination folder exists
+            os.makedirs(destination_folder, exist_ok=True)
+
+            # Copy each file to the destination folder
+            for i, file_path in enumerate(file_paths):
+                if os.path.exists(file_path):
+                    try:
+                        # Determine which subfolder to use
+                        if "Day 1" in file_path:
+                            subfolder = os.path.join(destination_folder, "Day 1")
+                        elif "Day 2" in file_path:
+                            subfolder = os.path.join(destination_folder, "Day 2")
+                        elif "Day 3" in file_path:
+                            subfolder = os.path.join(destination_folder, "Day 3")
+                        elif "Day 4" in file_path:
+                            subfolder = os.path.join(destination_folder, "Day 4")
+                        else:
+                            subfolder = os.path.join(destination_folder, "Others")  # Default subfolder
+
+                        # Ensure the subfolder exists
+                        os.makedirs(subfolder, exist_ok=True)
+
+                        # Get the file name and create the destination path
+                        base_name = os.path.basename(file_path)
+                        dest_path = os.path.join(subfolder, base_name)
+
+                        # Handle duplicate files by renaming (if necessary)
+                        if os.path.exists(dest_path):
+                            file_name, file_ext = os.path.splitext(base_name)
+                            counter = 1
+                            while os.path.exists(dest_path):
+                                dest_path = os.path.join(
+                                    subfolder, f"{file_name}_{counter}{file_ext}"
+                                )
+                                counter += 1
+
+                        # Copy the file to the destination path
+                        shutil.copy(file_path, dest_path)
+                        print(f"Copied: {file_path} -> {dest_path}")
+                    except Exception as e:
+                        print(f"Failed to copy {file_path}: {e}")
+                else:
+                    print(f"File not found: {file_path}")
+
+                # Update progress bar and count
+                progress_bar["value"] = i + 1
+                copied_count.set(f"Copied {i + 1}/{total_files}")
+                progress_window.update_idletasks()  # Force UI update
+
+            # Update the label once all files are copied
+            copied_count.set(f"Completed: {total_files}/{total_files}")
+            progress_label.config(text="Copying completed successfully!")
+        except Exception as e:
+            print(f"Error during file copying: {e}")
+            progress_label.config(text="Error occurred during copying!")
+        finally:
+            # Allow the user to close the progress window
+            progress_window.grab_release()
+            #progress_window.destroy()
+
     def load_existing_lists(self):
         """Load all existing lists from the photo-organiser folder."""
         for file_name in os.listdir(self.documents_folder):
@@ -121,12 +263,18 @@ class PhotoOrganizerApp:
         self.auto_save_label.config(text=f"AS: {self.autoSaveAllowed}")
     
     def save_data_auto(self):
-        if self.autoSaveAllowed and self.image_lists[self.current_list]:
-            self.export_list()
-            print("Data saved!")
-            current_time = datetime.now().strftime("%H:%M:%S")
-            self.auto_save_label.config(text=f"AS: {self.autoSaveAllowed} | {current_time}")
-        threading.Timer(5, self.save_data_auto).start()
+        if self.running:  # Check if the app is still running
+            if self.autoSaveAllowed and self.image_lists[self.current_list]:
+                self.export_list()
+                print("Data saved!")
+                current_time = datetime.now().strftime("%H:%M:%S")
+                self.auto_save_label.config(text=f"AS: {self.autoSaveAllowed} | {current_time}")
+            threading.Timer(5, self.save_data_auto).start()
+            
+    def on_exit(self):
+        """Handle cleanup when exiting the application."""
+        self.running = False  # Stop the auto-save thread
+        self.root.destroy()  # Destroy the Tkinter window
 
     def add_folder(self):
         """Allow the user to select a folder and add its images."""
