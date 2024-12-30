@@ -53,10 +53,7 @@ class PhotoOrganizerApp:
 
         # Ensure the photo-organiser folder exists
         if not os.path.exists(self.documents_folder):
-            os.makedirs(self.documents_folder)
-        
-        self.selected_images_file = os.path.join(self.documents_folder, "selected_images.txt")
-        
+            os.makedirs(self.documents_folder)        
         
         # Load existing lists from the folder
         self.load_existing_lists()
@@ -65,13 +62,12 @@ class PhotoOrganizerApp:
         self.toolbar = tk.Frame(root, bg="gray")
         self.toolbar.pack(side="top", fill="x")
 
-        
        # Create the main menu
         self.menu_bar = tk.Menu(self.root)
 
         # Add "File" menu
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        file_menu.add_command(label="Add Folder", command=self.add_folder)
+        file_menu.add_command(label="Add Images Folder", command=self.add_folder)
         file_menu.add_command(label="Export List", command=self.export_list_to_folder)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_exit)  # Add an exit option
@@ -82,6 +78,12 @@ class PhotoOrganizerApp:
         navigation_menu.add_command(label="Previous Image", command=self.previous_image)
         navigation_menu.add_command(label="Next Image", command=self.next_image)
         self.menu_bar.add_cascade(label="Navigation", menu=navigation_menu)
+        
+        # Add "Image" menu
+        image_menu = tk.Menu(self.menu_bar, tearoff=0)
+        image_menu.add_command(label="Rotate Left :<", command=self.rotate_left)
+        image_menu.add_command(label="Rotate Right :>", command=self.rotate_right)
+        self.menu_bar.add_cascade(label="Image", menu=image_menu)
 
         # Add "List" menu
         list_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -97,13 +99,15 @@ class PhotoOrganizerApp:
 
         # Add "Help" menu
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
-        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Photo Organizer App v1.0\nDeveloped by You"))
+        help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Photo Organizer App v1.0\nDeveloped by Ravi Kumar"))
         self.menu_bar.add_cascade(label="Help", menu=help_menu)
 
         # Configure the menu bar
         self.root.config(menu=self.menu_bar)
 
         # Dropdown for selecting lists
+        self.list_label = tk.Label(self.toolbar, text="Custom List:", fg="blue", bg="gray")
+        self.list_label.pack(side="left", padx=5)
         self.list_var = tk.StringVar(value=self.current_list)
         self.list_dropdown = ttk.Combobox(self.toolbar, textvariable=self.list_var, state="readonly")
         self.list_dropdown['values'] = list(self.image_lists.keys())
@@ -116,10 +120,6 @@ class PhotoOrganizerApp:
             self.list_var.set(self.current_list)  # Set default selected list
         else:
             self.list_var.set("No Lists")
-
-        # Rotate buttons
-        tk.Button(self.toolbar, text="Rotate Left :<", command=self.rotate_left).pack(side="left", padx=5, pady=10)
-        tk.Button(self.toolbar, text="Rotate Right :>", command=self.rotate_right).pack(side="left", padx=5, pady=10)
 
         self.status_label = tk.Label(self.toolbar, text="No image loaded", fg="blue", bg="gray")
         self.status_label.pack(side="left", padx=5)
@@ -274,6 +274,7 @@ class PhotoOrganizerApp:
     def on_exit(self):
         """Handle cleanup when exiting the application."""
         self.running = False  # Stop the auto-save thread
+        self.autoSaveAllowed = False
         self.root.destroy()  # Destroy the Tkinter window
 
     def add_folder(self):
