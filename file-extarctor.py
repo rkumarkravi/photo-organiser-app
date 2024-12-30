@@ -51,7 +51,7 @@ def copy_files_to_folder(input_file, destination_folder):
             print(f"File not found: {file_path}")
 
 # Example usage
-input_file = "D:\weeding-all-details\wedding pics selective\photofordrive.txt"  # Replace with your file containing the paths
-destination_folder = "D:\weeding-all-details\wedding pics selective\photofordrive"  # Replace with your destination folder path
+input_file = "D:\weeding-all-details\wedding pics selective\photowala-final.txt"  # Replace with your file containing the paths
+destination_folder = "D:\weeding-all-details\wedding pics selective\photowala-final"  # Replace with your destination folder path
 
 copy_files_to_folder(input_file, destination_folder)

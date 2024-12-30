@@ -25,6 +25,8 @@ class PhotoOrganizerApp:
         self.root.bind("<Right>", self.next_image)
         self.root.bind("l", self.add_to_list)  # For lowercase "l"
         self.root.bind("L", self.add_to_list)  # For uppercase "L"
+        self.root.bind("r", self.remove_from_list)  # For lowercase "l"
+        self.root.bind("R", self.remove_from_list)  # For uppercase "L"
         self.root.bind(",", self.rotate_left)  # For uppercase ","
         self.root.bind(".", self.rotate_right)  # For uppercase "."
 
@@ -63,6 +65,7 @@ class PhotoOrganizerApp:
         tk.Button(self.toolbar, text="Previous", command=self.previous_image).pack(side="left", padx=10, pady=10)
         tk.Button(self.toolbar, text="Next", command=self.next_image).pack(side="left", padx=10, pady=10)
         tk.Button(self.toolbar, text="Add to List : L", command=self.add_to_list).pack(side="left", padx=10, pady=10)
+        tk.Button(self.toolbar, text="Remove from List : R", command=self.remove_from_list).pack(side="left", padx=10, pady=10)
         tk.Button(self.toolbar, text="Export List", command=self.export_list).pack(side="left", padx=10, pady=10)
         tk.Button(self.toolbar, text="Auto Save", command=self.start_auto_save).pack(side="left", padx=10, pady=10)
         tk.Button(self.toolbar, text="New List", command=self.create_new_list).pack(side="left", padx=10, pady=10)
@@ -236,7 +239,7 @@ class PhotoOrganizerApp:
                         file.write(image_path + "\n")
                 #messagebox.showinfo("Export Successful", f"List '{self.current_list}' exported to {file_path}.")
         else:
-            messagebox.showwarning("No Images", f"No images in the list '{self.current_list}' to export.")
+            messagebox.showwarning("No Images ", f"No images in the list '{self.current_list}' to export.")
 
     def count_lines_in_file(self):
         try:
@@ -269,6 +272,21 @@ class PhotoOrganizerApp:
         """Toggle fullscreen mode."""
         is_fullscreen = root.attributes('-fullscreen')  # Check if fullscreen is enabled
         root.attributes('-fullscreen', not is_fullscreen)  # Toggle fullscreen state
+        
+    def remove_from_list(self, event=None):
+        """Remove the currently displayed image from the selected list."""
+        if self.image_paths:
+            current_image = self.image_paths[self.current_image_index]
+            if current_image in self.image_lists[self.current_list]:
+                self.image_lists[self.current_list].remove(current_image)
+                self.addedCount -= 1
+                self.added_label.config(text=f"'{self.current_list}' : {self.addedCount}")
+                self.export_list()  # Save the updated list to the file
+                messagebox.showinfo("Removed", f"Removed {os.path.basename(current_image)} from list '{self.current_list}'.")
+                print(f"Removed {os.path.basename(current_image)} from list '{self.current_list}'.")
+            else:
+                messagebox.showwarning("Not Found", "This image is not in the list.")
+
 
 
 if __name__ == "__main__":
