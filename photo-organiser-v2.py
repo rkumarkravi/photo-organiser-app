@@ -239,7 +239,7 @@ class PhotoOrganizerApp:
                         file.write(image_path + "\n")
                 #messagebox.showinfo("Export Successful", f"List '{self.current_list}' exported to {file_path}.")
         else:
-            messagebox.showwarning("No Images ", f"No images in the list '{self.current_list}' to export.")
+            messagebox.showwarning("No Images", f"No images in the list '{self.current_list}' to export.")
 
     def count_lines_in_file(self):
         try:
